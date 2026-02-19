@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RFQ Simulator</title>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+      background: linear-gradient(135deg, #0f172a, #0b1220);
+      color: #fff;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      padding: 40px;
+      gap: 40px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    .left {
+      width: 30%;
+    }
+
+    .right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 8px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .primary {
+      background: #2563eb;
+      color: white;
+    }
+
+    .primary:hover {
+      background: #1d4ed8;
+    }
+
+    .quote {
+      background: rgba(255,255,255,0.07);
+      padding: 18px;
+      border-radius: 12px;
+      transition: 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .quote.best {
+      border: 1px solid #22c55e;
+      background: rgba(34,197,94,0.15);
+    }
+
+    .quote-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .quote button {
+      margin-top: 10px;
+      background: #10b981;
+      color: white;
+    }
+
+    .quote button:hover {
+      background: #059669;
+    }
+
+    .log {
+      background: black;
+      padding: 16px;
+      border-radius: 12px;
+      font-family: monospace;
+      height: 150px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    .label {
+      opacity: 0.6;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="card left">
+    <h2>Send RFQ</h2>
+
+    <label class="label">From Asset</label>
+    <select id="asset">
+      <option>USDT</option>
+      <option>ETH</option>
+      <option>DAI</option>
+    </select>
+
+    <label class="label">Amount</label>
+    <input type="number" id="amount" value="1" />
+
+    <button class="primary" onclick="sendRFQ()">Send RFQ</button>
+  </div>
+
+  <div class="right">
+
+    <div class="card">
+      <h2>Incoming Quotes</h2>
+      <div id="quotes"></div>
+    </div>
+
+    <div class="card">
+      <h2>RFQ Log</h2>
+      <div class="log" id="log"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+async function sendRFQ() {
+  const asset = document.getElementById("asset").value;
+  const amount = parseFloat(document.getElementById("amount").value);
+
+  log(`[RFQ] Sent: ${amount} ${asset}`);
+
+  const res = await fetch("/api/rfq", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ asset, amount })
+  });
+
+  const data = await res.json();
+  renderQuotes(data.quotes, amount);
+}
+
+function renderQuotes(quotes, amount) {
+  const container = document.getElementById("quotes");
+  container.innerHTML = "";
+
+  const best = [...quotes].sort((a,b) => a.total - b.total)[0];
+
+  quotes.forEach(q => {
+    const div = document.createElement("div");
+    div.className = "quote";
+    if (q.peer === best.peer) div.classList.add("best");
+
+    div.innerHTML = `
+      <div class="quote-header">
+        <strong>${q.peer}</strong>
+        <span>Total: $${q.total}</span>
+      </div>
+      <div>Price: $${q.price}</div>
+      <div>Fee: ${q.fee}%</div>
+      <div>Effective Price: $${q.effectivePrice}</div>
+      <button onclick="acceptQuote('${q.peer}', ${q.total})">
+        Accept
+      </button>
+    `;
+
+    container.appendChild(div);
+    log(`[QUOTE] ${q.peer} → Total: $${q.total}`);
+  });
+}
+
+function acceptQuote(peer, total) {
+  log(`[ACCEPTED] ${peer} at $${total}`);
+}
+
+function log(message) {
+  const logBox = document.getElementById("log");
+  const time = new Date().toLocaleTimeString();
+  logBox.innerHTML += `[${time}] ${message}<br>`;
+  logBox.scrollTop = logBox.scrollHeight;
+}
+</script>
+
+</body>
+</html>
